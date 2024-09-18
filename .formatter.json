@@ -1,0 +1,7 @@
+{
+    "lineWidth": 80,
+    "tabWidth": 4,
+    "useTabs": false,
+    "bracketSpacing": true,
+    "explicitTypes": "always"
+}
