@@ -39,10 +39,11 @@ endif
 deploy-polygon:
 	@forge script script/DeployDigitalP2P.s.sol:DeployDigitalP2P $(NETWORK_ARGS)
 
-SENDER_ADDRESS := <sender's address>
+#SENDER_ADDRESS := <sender's address>
+SENDER_ADDRESS := 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
 
 processOrder:
-	@forge script script/Interactions.s.sol:FundFundMe --sender $(SENDER_ADDRESS) $(NETWORK_ARGS)
+	@forge script script/Interactions.s.sol:DigitalP2PProcessOrder --sender $(SENDER_ADDRESS) $(NETWORK_ARGS)
 
 releaseOrder:
-	@forge script script/Interactions.s.sol:WithdrawFundMe --sender $(SENDER_ADDRESS) $(NETWORK_ARGS)
+	@forge script script/Interactions.s.sol:DigitalP2PReleaseOrder --sender $(SENDER_ADDRESS) $(NETWORK_ARGS)
