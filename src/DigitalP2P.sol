@@ -6,6 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {UUIDValidatorLibrary} from "./UUIDValidatorLibrary.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
+error DigitalP2P_NotOwnerOrAdmin();
 error DigitalP2P_NotOwner();
 error DigitalP2P_InvalidAddress();
 error DigitalP2P_InvalidAmount();
@@ -32,14 +33,13 @@ contract DigitalP2P is Ownable {
         Pending,
         Completed,
         Fraud,
-        PriceMisMatch
+        PriceMismatch
     }
     // state vars
 
     uint256 constant USDT_DECIMAL_PLACES = 1e6; // 1 usdt
     uint256 private s_MinimumAmountUSD = USDT_DECIMAL_PLACES; // 1 usdt
     uint256 private s_MaximumAmountUSD = 500e6; // 500 usdt
-    address private s_owner;
     mapping(address => address) private s_admins;
 
     struct Order {
@@ -55,6 +55,26 @@ contract DigitalP2P is Ownable {
     IERC20 public usdtToken;
 
     // events
+    event orderCreated(
+        string indexed orderId,
+        orderStatus indexed status,
+        address buyer,
+        address seller,
+        uint256 cryptoAmount
+    );
+    event orderReleased(
+        string indexed orderId,
+        address indexed seller,
+        address indexed buyer,
+        uint256 cryptoAmount
+    );
+    event orderChangeStatus(
+        string indexed orderId,
+        address indexed user,
+        string indexed description,
+        orderStatus oldStatus,
+        orderStatus newStatus
+    );
     // Here we need to trigger events when
     // - the owner changes
     // - the minimum amount changes
@@ -70,13 +90,12 @@ contract DigitalP2P is Ownable {
         if (msg.sender == owner() || s_admins[msg.sender] != address(0)) {
             _;
         } else {
-            revert DigitalP2P_InvalidAddress();
+            revert DigitalP2P_NotOwnerOrAdmin();
         }
     }
 
     // functions
     constructor(address _usdtTokenAddress) Ownable(msg.sender) {
-        s_owner = msg.sender;
         usdtToken = IERC20(_usdtTokenAddress);
     }
 
@@ -129,6 +148,13 @@ contract DigitalP2P is Ownable {
             cryptoAmount: userUsdtAmountSent,
             status: orderStatus.Pending
         });
+        emit orderCreated(
+            _orderId,
+            orderStatus.Pending,
+            msg.sender,
+            _seller,
+            userUsdtAmountSent
+        );
     }
 
     /// @notice This function should be triggered by the seller to release the order.
@@ -149,6 +175,12 @@ contract DigitalP2P is Ownable {
 
         bool success = usdtToken.transfer(order.buyer, order.cryptoAmount);
         if (!success) revert DigitalP2P_TransferNotProccessed();
+        emit orderReleased(
+            _orderId,
+            order.seller,
+            order.buyer,
+            order.cryptoAmount
+        );
         delete s_Orders[_orderId];
     }
 
@@ -159,6 +191,7 @@ contract DigitalP2P is Ownable {
         if (!_orderId.isValidUUIDv4()) revert DigitalP2P_InvalidOrderId();
         Order storage order = s_Orders[_orderId];
         if (bytes(order.id).length == 0) revert DigitalP2P_OrderDoesNotExist();
+        emit orderChangeStatus(_orderId, msg.sender, string(abi.encodePacked("from", order.status, " to ", _status)), order.status, _status);
         order.status = _status;
     }
 
@@ -193,7 +226,7 @@ contract DigitalP2P is Ownable {
     function changeOwner(
         address _newOwner
     ) public onlyOwner validAddress(_newOwner) {
-        s_owner = _newOwner;
+        transferOwnership(_newOwner);
     }
 
     /// @notice Add an admin to the contract
@@ -237,7 +270,7 @@ contract DigitalP2P is Ownable {
 
     /// @notice Get the owner of the contract
     function getOwner() external view returns (address) {
-        return s_owner;
+        return owner();
     }
 
     /// @notice Get the order by id
