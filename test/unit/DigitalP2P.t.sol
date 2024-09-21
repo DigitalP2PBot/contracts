@@ -168,6 +168,38 @@ contract DigitalP2PTest is Test {
         );
     }
 
+    function testProcessOrderEventEmitsOrderCreatedWithIndexes() public {
+        uint256 amount = 5;
+        vm.prank(SELLER);
+        usdtToken.approve(address(digitalP2P), amount * USDT_DECIMAL_PLACES);
+        vm.expectEmit(true, true, false, false);
+        emit DigitalP2P.orderCreated(
+            ORDER_ID,
+            DigitalP2P.orderStatus.Pending,
+            msg.sender,
+            SELLER,
+            amount * USDT_DECIMAL_PLACES
+        );
+        vm.prank(msg.sender);
+        digitalP2P.processOrder(ORDER_ID, SELLER, amount, amount);
+    }
+
+    function testProcessOrderEventEmitsOrderCreatedNonIndexes() public {
+        uint256 amount = 5;
+        vm.prank(SELLER);
+        usdtToken.approve(address(digitalP2P), amount * USDT_DECIMAL_PLACES);
+        vm.expectEmit(false, false, true, true);
+        emit DigitalP2P.orderCreated(
+            ORDER_ID,
+            DigitalP2P.orderStatus.Pending,
+            msg.sender,
+            SELLER,
+            amount * USDT_DECIMAL_PLACES
+        );
+        vm.prank(msg.sender);
+        digitalP2P.processOrder(ORDER_ID, SELLER, amount, amount);
+    }
+
     function testProcessOrderOrderAlreadyExists() public {
         uint256 amount = 5;
         vm.prank(SELLER);
@@ -280,6 +312,52 @@ contract DigitalP2PTest is Test {
         );
     }
 
+    function testReleaseFundsEventEmitOrderReleaseWithIndexes() public {
+        uint256 amount = 5;
+        usdtToken.mint(
+            msg.sender,
+            AMOUNT_USDT_TOKEN_TO_MINT * USDT_DECIMAL_PLACES
+        );
+        vm.prank(SELLER);
+        usdtToken.approve(address(digitalP2P), amount * USDT_DECIMAL_PLACES);
+        vm.prank(msg.sender);
+        digitalP2P.processOrder(ORDER_ID, SELLER, amount, amount);
+        vm.prank(msg.sender);
+        digitalP2P.addAdmin(SELLER);
+        vm.expectEmit(true, true, true, false);
+        emit DigitalP2P.orderReleased(
+            ORDER_ID,
+            SELLER,
+            msg.sender,
+            amount * USDT_DECIMAL_PLACES
+        );
+        vm.prank(SELLER);
+        digitalP2P.releaseOrder(ORDER_ID);
+    }
+
+    function testReleaseFundsEventEmitOrderReleaseNonIndexes() public {
+        uint256 amount = 5;
+        usdtToken.mint(
+            msg.sender,
+            AMOUNT_USDT_TOKEN_TO_MINT * USDT_DECIMAL_PLACES
+        );
+        vm.prank(SELLER);
+        usdtToken.approve(address(digitalP2P), amount * USDT_DECIMAL_PLACES);
+        vm.prank(msg.sender);
+        digitalP2P.processOrder(ORDER_ID, SELLER, amount, amount);
+        vm.prank(msg.sender);
+        digitalP2P.addAdmin(SELLER);
+        vm.expectEmit(false, false, false, true);
+        emit DigitalP2P.orderReleased(
+            ORDER_ID,
+            SELLER,
+            msg.sender,
+            amount * USDT_DECIMAL_PLACES
+        );
+        vm.prank(SELLER);
+        digitalP2P.releaseOrder(ORDER_ID);
+    }
+
     function testReleaseFundsSuccessRemoveOrder() public {
         uint256 amount = 5;
         usdtToken.mint(
@@ -319,6 +397,40 @@ contract DigitalP2PTest is Test {
         digitalP2P.updateOrderStatus(ORDER_ID, DigitalP2P.orderStatus.Fraud);
         DigitalP2P.Order memory order = digitalP2P.getOrder(ORDER_ID);
         assertEq(uint256(order.status), uint256(DigitalP2P.orderStatus.Fraud));
+    }
+
+    function testUpdateStatusEventEmitChangeStatusWithIndexes() public {
+        uint256 amount = 5;
+        vm.prank(SELLER);
+        usdtToken.approve(address(digitalP2P), amount * USDT_DECIMAL_PLACES);
+        digitalP2P.processOrder(ORDER_ID, SELLER, amount, amount);
+        vm.expectEmit(true, true, true, false);
+        emit DigitalP2P.orderChangeStatus(
+            ORDER_ID,
+            msg.sender,
+            string(abi.encodePacked("from", DigitalP2P.orderStatus.Pending, " to ", DigitalP2P.orderStatus.PriceMismatch)),
+            DigitalP2P.orderStatus.Pending,
+            DigitalP2P.orderStatus.PriceMismatch
+        );
+        vm.prank(msg.sender);
+        digitalP2P.updateOrderStatus(ORDER_ID, DigitalP2P.orderStatus.PriceMismatch);
+    }
+
+    function testUpdateStatusEventEmitChangeStatusNonIndexes() public {
+        uint256 amount = 5;
+        vm.prank(SELLER);
+        usdtToken.approve(address(digitalP2P), amount * USDT_DECIMAL_PLACES);
+        digitalP2P.processOrder(ORDER_ID, SELLER, amount, amount);
+        vm.expectEmit(false, false, false, true);
+        emit DigitalP2P.orderChangeStatus(
+            ORDER_ID,
+            msg.sender,
+            string(abi.encodePacked("from", DigitalP2P.orderStatus.Pending, " to ", DigitalP2P.orderStatus.PriceMismatch)),
+            DigitalP2P.orderStatus.Pending,
+            DigitalP2P.orderStatus.PriceMismatch
+        );
+        vm.prank(msg.sender);
+        digitalP2P.updateOrderStatus(ORDER_ID, DigitalP2P.orderStatus.PriceMismatch);
     }
 
     function testAddAdminShouldBeOwner() public {
