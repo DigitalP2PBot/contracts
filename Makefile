@@ -37,6 +37,9 @@ ifeq ($(findstring --network polygon,$(ARGS)),--network polygon)
 endif
 
 deploy-polygon:
+	@forge format
+	@forge clean
+	@forge test
 	@forge script script/DeployDigitalP2P.s.sol:DeployDigitalP2P $(NETWORK_ARGS)
 
 #SENDER_ADDRESS := <sender's address>

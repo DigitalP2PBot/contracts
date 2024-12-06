@@ -26,37 +26,29 @@ contract DigitalP2PProcessOrder is Script {
         usdtToken.mint(SELLER, AMOUNT_USDT_TOKEN_TO_MINT * USDT_DECIMAL_PLACES);
         usdtToken.approve(address(digitalP2P), _amount * USDT_DECIMAL_PLACES);
 
-        digitalP2P.processOrder(ORDER_ID, SELLER, _amount, _amount);
+        digitalP2P.processOrder(ORDER_ID, _amount);
         vm.stopBroadcast();
     }
 
     function run() public {
-        address mostRecentlyDeployed = DevOpsTools.get_most_recent_deployment(
-            "DigitalP2P",
-            block.chainid
-        );
-        console.log(
-            "last deploy[, mostRecentlyDeployed]",
-            mostRecentlyDeployed
-        );
+        address mostRecentlyDeployed = DevOpsTools.get_most_recent_deployment("DigitalP2P", block.chainid);
+        console.log("last deploy[, mostRecentlyDeployed]", mostRecentlyDeployed);
         processOrder(payable(mostRecentlyDeployed));
     }
 }
 
 contract DigitalP2PReleaseOrder is Script {
     string constant ORDER_ID = "f47ac10b-58cc-4372-a567-0e02b2c3d479";
+    address BUYER = address(1);
 
     function releaseOrder(address mostRecentlyDeployed) public {
         vm.startBroadcast();
-        DigitalP2P(payable(mostRecentlyDeployed)).releaseOrder(ORDER_ID);
+        DigitalP2P(payable(mostRecentlyDeployed)).releaseOrder(ORDER_ID, BUYER);
         vm.stopBroadcast();
     }
 
     function run() public {
-        address mostRecentlyDeployed = DevOpsTools.get_most_recent_deployment(
-            "DigitalP2P",
-            block.chainid
-        );
+        address mostRecentlyDeployed = DevOpsTools.get_most_recent_deployment("DigitalP2P", block.chainid);
         releaseOrder(mostRecentlyDeployed);
     }
 }

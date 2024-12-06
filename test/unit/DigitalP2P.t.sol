@@ -7,7 +7,22 @@ import {Test, console} from "forge-std/Test.sol";
 import {DeployDigitalP2P} from "../../script/DeployDigitalP2P.s.sol";
 import {DigitalP2P} from "../../src/DigitalP2P.sol";
 import {ERC20Mock} from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
-import {DigitalP2P_NotOwner, DigitalP2P_InvalidAddress, DigitalP2P_InvalidAmount, DigitalP2P_AmountShouldBeGreaterThanZero, DigitalP2P_AmountShouldBeGreaterThanMinimumAmount, DigitalP2P_AmountShouldBeLessThanMaximumAmount, DigitalP2P_TransferNotProccessed, DigitalP2P_InvalidOrderId, DigitalP2P_OrderAlreadyExists, DigitalP2P_InvalidOrderStatus, DigitalP2P_UserIsNotAllowedToReleaseFunds, DigitalP2P_OrderDoesNotExist, DigitalP2P_AmountExpectedDoesNotMatch, DigitalP2P_AdminAddressAlreadyExists} from "../../src/DigitalP2P.sol";
+import {
+    DigitalP2P_InsufficientUsdtBalance,
+    DigitalP2P_NotOwner,
+    DigitalP2P_InvalidAddress,
+    DigitalP2P_InvalidAmount,
+    DigitalP2P_AmountShouldBeGreaterThanZero,
+    DigitalP2P_AmountShouldBeGreaterThanMinimumAmount,
+    DigitalP2P_AmountShouldBeLessThanMaximumAmount,
+    DigitalP2P_TransferNotProccessed,
+    DigitalP2P_InvalidOrderId,
+    DigitalP2P_OrderAlreadyExists,
+    DigitalP2P_InvalidOrderStatus,
+    DigitalP2P_OrderDoesNotExist,
+    DigitalP2P_AmountExpectedDoesNotMatch,
+    DigitalP2P_AdminAddressAlreadyExists
+} from "../../src/DigitalP2P.sol";
 
 contract DigitalP2PTest is Test {
     DigitalP2P digitalP2P;
@@ -21,14 +36,15 @@ contract DigitalP2PTest is Test {
     string constant ORDER_ID = "f47ac10b-58cc-4372-a567-0e02b2c3d479";
     address USER = makeAddr("user");
     address SELLER = makeAddr("seller");
-    address BUYER = makeAddr("seller");
+    address BUYER = makeAddr("buyer");
 
     function setUp() external {
         deployDigitalP2P = new DeployDigitalP2P();
         digitalP2P = deployDigitalP2P.run();
         usdtToken = ERC20Mock(address(digitalP2P.usdtToken()));
-        usdtToken.mint(USER, AMOUNT_USDT_TOKEN_TO_MINT * USDT_DECIMAL_PLACES);
-        usdtToken.mint(SELLER, AMOUNT_USDT_TOKEN_TO_MINT * USDT_DECIMAL_PLACES);
+        usdtToken.mint(USER, AMOUNT_USDT_TOKEN_TO_MINT);
+        usdtToken.mint(BUYER, AMOUNT_USDT_TOKEN_TO_MINT);
+        usdtToken.mint(SELLER, AMOUNT_USDT_TOKEN_TO_MINT);
         vm.deal(USER, STARTING_BALANCE);
     }
 
@@ -73,10 +89,7 @@ contract DigitalP2PTest is Test {
         vm.prank(msg.sender);
         digitalP2P.setMaximumAmount(newAmount);
         console.log("maxinum amount", digitalP2P.getMaximumAmount());
-        assertEq(
-            digitalP2P.getMaximumAmount(),
-            newAmount * USDT_DECIMAL_PLACES
-        );
+        assertEq(digitalP2P.getMaximumAmount(), newAmount * USDT_DECIMAL_PLACES);
     }
 
     function testSetMaximumAmountNotOwner() public {
@@ -94,134 +107,109 @@ contract DigitalP2PTest is Test {
     }
 
     function testGetMinimumAmount() public view {
-        assertEq(
-            digitalP2P.getMinimumAmount(),
-            minimumAmount * USDT_DECIMAL_PLACES
-        );
+        assertEq(digitalP2P.getMinimumAmount(), minimumAmount * USDT_DECIMAL_PLACES);
     }
 
     function testGetMaximumAmount() public view {
-        assertEq(
-            digitalP2P.getMaximumAmount(),
-            maximumAmount * USDT_DECIMAL_PLACES
-        );
+        assertEq(digitalP2P.getMaximumAmount(), maximumAmount * USDT_DECIMAL_PLACES);
     }
 
     function testGetBalance() public {
         vm.prank(msg.sender);
-        (bool success, ) = address(digitalP2P).call{value: STARTING_BALANCE}(
-            ""
-        );
+        (bool success,) = address(digitalP2P).call{value: STARTING_BALANCE}("");
         assert(success);
         assertEq(digitalP2P.getBalance(), STARTING_BALANCE);
     }
 
     function testProcessOrderAmountShouldBeGreaterThanZero() public {
         vm.expectRevert();
-        digitalP2P.processOrder("0", address(0), 0, 0);
+        digitalP2P.processOrder("0", 0);
     }
 
     function testProcessOrderAmountShouldBeGreatherThanMinimumAmount() public {
         vm.prank(msg.sender);
         digitalP2P.setMinimumAmount(10);
         vm.expectRevert();
-        digitalP2P.processOrder("0", address(0), 5, 5);
+        digitalP2P.processOrder("0", 5000000);
     }
 
     function testProcessOrderAmounShouldBeLessThanMaximumAmount() public {
         vm.prank(msg.sender);
         digitalP2P.setMaximumAmount(10);
         vm.expectRevert();
-        digitalP2P.processOrder("0", address(0), 15, 15);
+        digitalP2P.processOrder("0", 15000000);
     }
 
     function testProcessOrderInvalidOrderId() public {
         vm.prank(msg.sender);
         vm.expectRevert();
-        digitalP2P.processOrder("282828282-28282828", address(0), 15, 15);
+        digitalP2P.processOrder("282828282-28282828", 15000000);
     }
 
     function testProcessOrderInvalidSellerAddress() public {
         vm.prank(msg.sender);
         vm.expectRevert();
-        digitalP2P.processOrder(
-            "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-            address(0),
-            15,
-            15
-        );
+        digitalP2P.processOrder("f47ac10b-58cc-4372-a567-0e02b2c3d479", 15000000);
     }
 
     function testProcessOrderOrderCreated() public {
-        uint256 amount = 5;
+        uint256 amount = 5 * USDT_DECIMAL_PLACES;
         vm.startPrank(SELLER);
-        usdtToken.approve(address(digitalP2P), amount * USDT_DECIMAL_PLACES);
-        digitalP2P.processOrder(ORDER_ID, SELLER, amount, amount);
+        usdtToken.approve(address(digitalP2P), amount);
+        digitalP2P.processOrder(ORDER_ID, amount);
         vm.stopPrank();
         DigitalP2P.Order memory orderCreated = digitalP2P.getOrder(ORDER_ID);
-        assertEq(orderCreated.buyer, SELLER);
-        assertEq(orderCreated.seller, SELLER);
-        assertEq(orderCreated.cryptoAmount, amount * USDT_DECIMAL_PLACES);
-        assertEq(
-            uint256(orderCreated.status),
-            uint256(DigitalP2P.orderStatus.Pending)
-        );
+        assertEq(orderCreated.cryptoAmount, amount);
+        assertEq(uint256(orderCreated.status), uint256(DigitalP2P.orderStatus.Pending));
     }
 
     function testProcessOrderEventEmitsOrderCreatedWithIndexes() public {
-        uint256 amount = 5;
+        uint256 amount = 5 * USDT_DECIMAL_PLACES;
         vm.prank(SELLER);
-        usdtToken.approve(address(digitalP2P), amount * USDT_DECIMAL_PLACES);
+        usdtToken.approve(address(digitalP2P), amount);
         vm.expectEmit(true, true, false, false);
-        emit DigitalP2P.orderCreated(
-            ORDER_ID,
-            DigitalP2P.orderStatus.Pending,
-            msg.sender,
-            SELLER,
-            amount * USDT_DECIMAL_PLACES
-        );
-        vm.prank(msg.sender);
-        digitalP2P.processOrder(ORDER_ID, SELLER, amount, amount);
+        emit DigitalP2P.orderCreated(DigitalP2P.orderStatus.Pending, ORDER_ID, amount);
+        vm.prank(SELLER);
+        digitalP2P.processOrder(ORDER_ID, amount);
     }
 
     function testProcessOrderEventEmitsOrderCreatedNonIndexes() public {
-        uint256 amount = 5;
+        uint256 amount = 5 * USDT_DECIMAL_PLACES;
         vm.prank(SELLER);
-        usdtToken.approve(address(digitalP2P), amount * USDT_DECIMAL_PLACES);
-        vm.expectEmit(false, false, true, true);
-        emit DigitalP2P.orderCreated(
-            ORDER_ID,
-            DigitalP2P.orderStatus.Pending,
-            msg.sender,
-            SELLER,
-            amount * USDT_DECIMAL_PLACES
-        );
-        vm.prank(msg.sender);
-        digitalP2P.processOrder(ORDER_ID, SELLER, amount, amount);
+        usdtToken.approve(address(digitalP2P), amount);
+        vm.expectEmit(false, true, true, true);
+        emit DigitalP2P.orderCreated(DigitalP2P.orderStatus.Pending, ORDER_ID, amount);
+        vm.prank(SELLER);
+        digitalP2P.processOrder(ORDER_ID, amount);
     }
 
     function testProcessOrderOrderAlreadyExists() public {
-        uint256 amount = 5;
+        uint256 amount = 5 * USDT_DECIMAL_PLACES;
         vm.prank(SELLER);
-        usdtToken.approve(address(digitalP2P), amount * USDT_DECIMAL_PLACES);
-        digitalP2P.processOrder(ORDER_ID, SELLER, amount, amount);
+        usdtToken.approve(address(digitalP2P), amount);
+        vm.prank(SELLER);
+        digitalP2P.processOrder(ORDER_ID, amount);
         vm.expectRevert();
-        digitalP2P.processOrder(ORDER_ID, SELLER, amount, amount);
+        vm.prank(SELLER);
+        digitalP2P.processOrder(ORDER_ID, amount);
     }
 
-    function testProcessOrderPriceMisMatch() public {
-        uint256 amount = 5;
+    function testProcessOrderPriceWithDecimals() public {
+        uint256 amount = 2200000;
         vm.prank(SELLER);
-        usdtToken.approve(address(digitalP2P), amount * USDT_DECIMAL_PLACES);
-        vm.expectRevert(DigitalP2P_AmountExpectedDoesNotMatch.selector);
-        digitalP2P.processOrder(ORDER_ID, SELLER, amount, amount + 1);
+        usdtToken.approve(address(digitalP2P), amount);
+        vm.prank(SELLER);
+        digitalP2P.processOrder(ORDER_ID, amount);
+        DigitalP2P.Order memory orderCreated = digitalP2P.getOrder(ORDER_ID);
+        assertEq(orderCreated.cryptoAmount, amount);
     }
 
     function testProcessOrderGetUsdtBalance() public {
         uint256 amount = 5 * USDT_DECIMAL_PLACES;
         vm.prank(SELLER);
         usdtToken.approve(address(digitalP2P), amount);
-        digitalP2P.processOrder(ORDER_ID, SELLER, 5, 5);
+        vm.prank(SELLER);
+        digitalP2P.processOrder(ORDER_ID, amount);
         digitalP2P.getOrder(ORDER_ID);
         uint256 balance = digitalP2P.getUSDTBalance();
         assertEq(balance, amount);
@@ -255,120 +243,109 @@ contract DigitalP2PTest is Test {
     function testReleaseFundsShouldBeOwner() public {
         vm.expectRevert();
         vm.prank(USER);
-        digitalP2P.releaseOrder(ORDER_ID);
+        digitalP2P.releaseOrder(ORDER_ID, BUYER);
     }
 
     function testReleaseFundsOrderDoesNotExist() public {
         vm.expectRevert(DigitalP2P_OrderDoesNotExist.selector);
         vm.prank(msg.sender);
-        digitalP2P.releaseOrder("f47ac10b-58cc-4372-a567-0e02b2c3d478");
+        digitalP2P.releaseOrder("f47ac10b-58cc-4372-a567-0e02b2c3d478", BUYER);
     }
 
     function testReleaseFundsInvalidOrderUUID() public {
         vm.expectRevert(DigitalP2P_InvalidOrderId.selector);
         vm.prank(msg.sender);
-        digitalP2P.releaseOrder("f47ac10b-58c");
+        digitalP2P.releaseOrder("f47ac10b-58c", BUYER);
     }
 
     function testReleaseFundsInvalidStatus() public {
-        uint256 amount = 5;
+        uint256 amount = 5 * USDT_DECIMAL_PLACES;
         vm.prank(SELLER);
-        usdtToken.approve(address(digitalP2P), amount * USDT_DECIMAL_PLACES);
-        vm.prank(msg.sender);
-        digitalP2P.processOrder(ORDER_ID, SELLER, amount, amount);
+        usdtToken.approve(address(digitalP2P), amount);
+        vm.prank(SELLER);
+        digitalP2P.processOrder(ORDER_ID, amount);
         vm.prank(msg.sender);
         digitalP2P.updateOrderStatus(ORDER_ID, DigitalP2P.orderStatus.Fraud);
         vm.expectRevert(DigitalP2P_InvalidOrderStatus.selector);
         vm.prank(msg.sender);
-        digitalP2P.releaseOrder(ORDER_ID);
+        digitalP2P.releaseOrder(ORDER_ID, BUYER);
     }
 
-    function testReleaseFundsUserIsNotAllowedToReleaseFunds() public {
-        uint256 amount = 5;
+    function testReleaseFundsInvalidBuyerAddress() public {
+        uint256 amount = 5 * USDT_DECIMAL_PLACES;
         vm.prank(SELLER);
-        usdtToken.approve(address(digitalP2P), amount * USDT_DECIMAL_PLACES);
+        usdtToken.approve(address(digitalP2P), amount);
+        vm.prank(SELLER);
+        digitalP2P.processOrder(ORDER_ID, amount);
+        vm.expectRevert(DigitalP2P_InvalidAddress.selector);
         vm.prank(msg.sender);
-        digitalP2P.processOrder(ORDER_ID, SELLER, amount, amount);
-        vm.prank(msg.sender);
-        vm.expectRevert(DigitalP2P_UserIsNotAllowedToReleaseFunds.selector);
-        digitalP2P.releaseOrder(ORDER_ID);
+        digitalP2P.releaseOrder(ORDER_ID, address(0));
     }
 
     function testReleaseFundsSuccess() public {
-        uint256 amount = 5;
-        usdtToken.mint(
-            msg.sender,
-            AMOUNT_USDT_TOKEN_TO_MINT * USDT_DECIMAL_PLACES
-        );
+        uint256 amount = 5 * USDT_DECIMAL_PLACES;
+        vm.prank(SELLER);
+        usdtToken.approve(address(digitalP2P), amount);
+        vm.prank(SELLER);
+        digitalP2P.processOrder(ORDER_ID, amount);
         vm.prank(msg.sender);
-        usdtToken.approve(address(digitalP2P), amount * USDT_DECIMAL_PLACES);
-        digitalP2P.processOrder(ORDER_ID, msg.sender, amount, amount);
+        digitalP2P.releaseOrder(ORDER_ID, BUYER);
+        uint256 buyerBalance = digitalP2P.getUserBalance(BUYER);
+        uint256 botFee = digitalP2P.getBotFee(amount);
+        assertEq(buyerBalance, AMOUNT_USDT_TOKEN_TO_MINT * USDT_DECIMAL_PLACES + amount - botFee);
+    }
+
+    function testReleaseFundsSuccessAmountWithDecimal() public {
+        uint256 amount = 4790000;
+        vm.prank(SELLER);
+        usdtToken.approve(address(digitalP2P), amount);
+        vm.prank(SELLER);
+        digitalP2P.processOrder(ORDER_ID, amount);
         vm.prank(msg.sender);
-        digitalP2P.releaseOrder(ORDER_ID);
-        uint256 buyerBalance = digitalP2P.getUserBalance(msg.sender);
-        assertEq(
-            buyerBalance + amount * USDT_DECIMAL_PLACES,
-            AMOUNT_USDT_TOKEN_TO_MINT * USDT_DECIMAL_PLACES
-        );
+        digitalP2P.releaseOrder(ORDER_ID, BUYER);
+        uint256 buyerBalance = digitalP2P.getUserBalance(BUYER);
+        uint256 botFee = digitalP2P.getBotFee(amount);
+        assertEq(buyerBalance, AMOUNT_USDT_TOKEN_TO_MINT * USDT_DECIMAL_PLACES + amount - botFee);
     }
 
     function testReleaseFundsEventEmitOrderReleaseWithIndexes() public {
-        uint256 amount = 5;
-        usdtToken.mint(
-            msg.sender,
-            AMOUNT_USDT_TOKEN_TO_MINT * USDT_DECIMAL_PLACES
-        );
+        uint256 amount = 5 * USDT_DECIMAL_PLACES;
+        usdtToken.mint(msg.sender, AMOUNT_USDT_TOKEN_TO_MINT);
         vm.prank(SELLER);
         usdtToken.approve(address(digitalP2P), amount * USDT_DECIMAL_PLACES);
-        vm.prank(msg.sender);
-        digitalP2P.processOrder(ORDER_ID, SELLER, amount, amount);
+        vm.prank(SELLER);
+        digitalP2P.processOrder(ORDER_ID, amount);
         vm.prank(msg.sender);
         digitalP2P.addAdmin(SELLER);
         vm.expectEmit(true, true, true, false);
-        emit DigitalP2P.orderReleased(
-            ORDER_ID,
-            SELLER,
-            msg.sender,
-            amount * USDT_DECIMAL_PLACES
-        );
+        emit DigitalP2P.orderReleased(ORDER_ID, amount * USDT_DECIMAL_PLACES);
         vm.prank(SELLER);
-        digitalP2P.releaseOrder(ORDER_ID);
+        digitalP2P.releaseOrder(ORDER_ID, BUYER);
     }
 
     function testReleaseFundsEventEmitOrderReleaseNonIndexes() public {
-        uint256 amount = 5;
-        usdtToken.mint(
-            msg.sender,
-            AMOUNT_USDT_TOKEN_TO_MINT * USDT_DECIMAL_PLACES
-        );
+        uint256 amount = 5 * USDT_DECIMAL_PLACES;
+        usdtToken.mint(msg.sender, AMOUNT_USDT_TOKEN_TO_MINT * USDT_DECIMAL_PLACES);
         vm.prank(SELLER);
-        usdtToken.approve(address(digitalP2P), amount * USDT_DECIMAL_PLACES);
-        vm.prank(msg.sender);
-        digitalP2P.processOrder(ORDER_ID, SELLER, amount, amount);
+        usdtToken.approve(address(digitalP2P), amount);
+        vm.prank(SELLER);
+        digitalP2P.processOrder(ORDER_ID, amount);
         vm.prank(msg.sender);
         digitalP2P.addAdmin(SELLER);
         vm.expectEmit(false, false, false, true);
-        emit DigitalP2P.orderReleased(
-            ORDER_ID,
-            SELLER,
-            msg.sender,
-            amount * USDT_DECIMAL_PLACES
-        );
+        emit DigitalP2P.orderReleased(ORDER_ID, amount);
         vm.prank(SELLER);
-        digitalP2P.releaseOrder(ORDER_ID);
+        digitalP2P.releaseOrder(ORDER_ID, BUYER);
     }
 
     function testReleaseFundsSuccessRemoveOrder() public {
-        uint256 amount = 5;
-        usdtToken.mint(
-            msg.sender,
-            AMOUNT_USDT_TOKEN_TO_MINT * USDT_DECIMAL_PLACES
-        );
+        uint256 amount = 5 * USDT_DECIMAL_PLACES;
+        vm.prank(SELLER);
+        usdtToken.approve(address(digitalP2P), amount);
+        vm.prank(SELLER);
+        digitalP2P.processOrder(ORDER_ID, amount);
         vm.prank(msg.sender);
-        usdtToken.approve(address(digitalP2P), amount * USDT_DECIMAL_PLACES);
-        digitalP2P.processOrder(ORDER_ID, msg.sender, amount, amount);
-        vm.prank(msg.sender);
-        digitalP2P.releaseOrder(ORDER_ID);
+        digitalP2P.releaseOrder(ORDER_ID, BUYER);
         DigitalP2P.Order memory order = digitalP2P.getOrder(ORDER_ID);
         assertEq(bytes(order.id).length, 0);
     }
@@ -376,10 +353,7 @@ contract DigitalP2PTest is Test {
     function testUpdateStatusInvalidUUID() public {
         vm.expectRevert(DigitalP2P_InvalidOrderId.selector);
         vm.prank(msg.sender);
-        digitalP2P.updateOrderStatus(
-            "f47ac10b-58c",
-            DigitalP2P.orderStatus.Fraud
-        );
+        digitalP2P.updateOrderStatus("f47ac10b-58c", DigitalP2P.orderStatus.Fraud);
     }
 
     function testUpdateStatusOrdesDoesNotExist() public {
@@ -389,10 +363,11 @@ contract DigitalP2PTest is Test {
     }
 
     function testUpdateStatusSuccess() public {
-        uint256 amount = 5;
+        uint256 amount = 5 * USDT_DECIMAL_PLACES;
         vm.prank(SELLER);
-        usdtToken.approve(address(digitalP2P), amount * USDT_DECIMAL_PLACES);
-        digitalP2P.processOrder(ORDER_ID, SELLER, amount, amount);
+        usdtToken.approve(address(digitalP2P), amount);
+        vm.prank(SELLER);
+        digitalP2P.processOrder(ORDER_ID, amount);
         vm.prank(msg.sender);
         digitalP2P.updateOrderStatus(ORDER_ID, DigitalP2P.orderStatus.Fraud);
         DigitalP2P.Order memory order = digitalP2P.getOrder(ORDER_ID);
@@ -400,15 +375,18 @@ contract DigitalP2PTest is Test {
     }
 
     function testUpdateStatusEventEmitChangeStatusWithIndexes() public {
-        uint256 amount = 5;
+        uint256 amount = 5 * USDT_DECIMAL_PLACES;
         vm.prank(SELLER);
-        usdtToken.approve(address(digitalP2P), amount * USDT_DECIMAL_PLACES);
-        digitalP2P.processOrder(ORDER_ID, SELLER, amount, amount);
+        usdtToken.approve(address(digitalP2P), amount);
+        vm.prank(SELLER);
+        digitalP2P.processOrder(ORDER_ID, amount);
         vm.expectEmit(true, true, true, false);
         emit DigitalP2P.orderChangeStatus(
             ORDER_ID,
             msg.sender,
-            string(abi.encodePacked("from", DigitalP2P.orderStatus.Pending, " to ", DigitalP2P.orderStatus.PriceMismatch)),
+            string(
+                abi.encodePacked("from", DigitalP2P.orderStatus.Pending, " to ", DigitalP2P.orderStatus.PriceMismatch)
+            ),
             DigitalP2P.orderStatus.Pending,
             DigitalP2P.orderStatus.PriceMismatch
         );
@@ -417,15 +395,18 @@ contract DigitalP2PTest is Test {
     }
 
     function testUpdateStatusEventEmitChangeStatusNonIndexes() public {
-        uint256 amount = 5;
+        uint256 amount = 5 * USDT_DECIMAL_PLACES;
         vm.prank(SELLER);
-        usdtToken.approve(address(digitalP2P), amount * USDT_DECIMAL_PLACES);
-        digitalP2P.processOrder(ORDER_ID, SELLER, amount, amount);
+        usdtToken.approve(address(digitalP2P), amount);
+        vm.prank(SELLER);
+        digitalP2P.processOrder(ORDER_ID, amount);
         vm.expectEmit(false, false, false, true);
         emit DigitalP2P.orderChangeStatus(
             ORDER_ID,
             msg.sender,
-            string(abi.encodePacked("from", DigitalP2P.orderStatus.Pending, " to ", DigitalP2P.orderStatus.PriceMismatch)),
+            string(
+                abi.encodePacked("from", DigitalP2P.orderStatus.Pending, " to ", DigitalP2P.orderStatus.PriceMismatch)
+            ),
             DigitalP2P.orderStatus.Pending,
             DigitalP2P.orderStatus.PriceMismatch
         );
@@ -480,6 +461,82 @@ contract DigitalP2PTest is Test {
         digitalP2P.removeAdmin(admin);
         address expectedAdmin = digitalP2P.getAdmin(admin);
         assertEq(address(0), expectedAdmin);
+    }
+
+    function testWithDrawTokenInsufficientFunds() public {
+        uint256 amount = 2 * USDT_DECIMAL_PLACES;
+        address userTo = makeAddr("new user");
+        vm.expectRevert(DigitalP2P_InsufficientUsdtBalance.selector);
+        vm.prank(msg.sender);
+        digitalP2P.withDrawToken(userTo, amount);
+    }
+
+    function testWithDrawTokenInvalidAddressRecipient() public {
+        uint256 amount = 2 * USDT_DECIMAL_PLACES;
+        address userTo = address(0);
+        usdtToken.mint(address(digitalP2P), AMOUNT_USDT_TOKEN_TO_MINT);
+        vm.expectRevert(DigitalP2P_InvalidAddress.selector);
+        vm.prank(msg.sender);
+        digitalP2P.withDrawToken(userTo, amount);
+    }
+
+    function testWithDrawTokenInvalidAmount() public {
+        uint256 amount = 0;
+        address userTo = makeAddr("new user");
+        usdtToken.mint(address(digitalP2P), AMOUNT_USDT_TOKEN_TO_MINT);
+        vm.expectRevert(DigitalP2P_AmountShouldBeGreaterThanZero.selector);
+        vm.prank(msg.sender);
+        digitalP2P.withDrawToken(userTo, amount);
+    }
+
+    function testWithDrawTokenOnlyAdmin() public {
+        uint256 amount = 2 * USDT_DECIMAL_PLACES;
+        address userTo = makeAddr("new user");
+        vm.expectRevert();
+        digitalP2P.withDrawToken(userTo, amount);
+    }
+
+    function testWithDrawToken() public {
+        usdtToken.mint(address(digitalP2P), AMOUNT_USDT_TOKEN_TO_MINT);
+        uint256 amount = 2 * USDT_DECIMAL_PLACES;
+        address userTo = makeAddr("new user");
+        vm.prank(msg.sender);
+        digitalP2P.withDrawToken(userTo, amount);
+        uint256 userBalance = digitalP2P.getUserBalance(userTo);
+        assertEq(userBalance, amount);
+    }
+
+    function testWithdrawNativeTokenShouldBeOwner() public {
+        uint256 amount = 1 ether;
+        payable(address(digitalP2P)).transfer(amount);
+        vm.expectRevert();
+        digitalP2P.withdraw();
+    }
+
+    function testFundContract() public {
+        uint256 amount = 1 ether;
+        vm.prank(msg.sender);
+        payable(address(digitalP2P)).transfer(amount);
+        uint256 balance = digitalP2P.getBalance();
+        assertEq(balance, amount);
+    }
+
+    function testWithDrawNativeToken() public {
+        uint256 amount = 1 ether;
+        payable(address(digitalP2P)).transfer(amount);
+        vm.prank(msg.sender);
+        digitalP2P.withdraw();
+        uint256 newBalance = digitalP2P.getBalance();
+        assertEq(newBalance, 0);
+    }
+
+    function testUserApproveSCToSpend() public {
+        uint256 amount = 5 * USDT_DECIMAL_PLACES;
+        vm.prank(msg.sender);
+        bool approved = digitalP2P.approve(amount);
+        assert(approved);
+        uint256 userAllowance = digitalP2P.getUserAllowance(address(digitalP2P));
+        assertEq(userAllowance, amount);
     }
 
     // Update status
