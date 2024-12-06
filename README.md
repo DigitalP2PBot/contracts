@@ -66,7 +66,7 @@ forge test
 forge coverage
 ```
 
-and for coverage based testing: 
+and for coverage based testing:
 
 ```
 forge coverage --report debug
@@ -124,3 +124,4 @@ ETH/Arbitrum/Optimism/Polygon/etc Address: 0x14d5d32bccdaa481e41868206c96fd97f49
 
 [![Jonathan Díaz Twitter](https://img.shields.io/badge/Twitter-1DA1F2?style=for-the-badge&logo=twitter&logoColor=white)](https://x.com/jonthdiaz)
 [![Jonathan Díaz Linkedin](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/jonthdiaz/)
+[![Lightning Address](https://img.shields.io/badge/⚡️%20Lightning%20Address-alby-orange?style=for-the-badge)](lightning:jonthdiaz@getalby.com)
