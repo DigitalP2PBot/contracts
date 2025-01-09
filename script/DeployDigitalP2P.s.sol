@@ -8,10 +8,8 @@ import {HelperConfig} from "./HelperConfig.s.sol";
 
 contract DeployDigitalP2P is Script {
     function run() external returns (DigitalP2P) {
-        HelperConfig helperConfig = new HelperConfig();
-        (, address usdtTokenAddress) = helperConfig.activeNetworkConfig();
         vm.startBroadcast();
-        DigitalP2P digitalP2P = new DigitalP2P(usdtTokenAddress);
+        DigitalP2P digitalP2P = new DigitalP2P();
         vm.stopBroadcast();
         return digitalP2P;
     }

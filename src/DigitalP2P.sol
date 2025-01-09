@@ -49,17 +49,25 @@ contract DigitalP2P is Ownable {
         string id;
         uint256 cryptoAmount;
         orderStatus status;
+        address tokenAddress;
     }
     // The order only can be exist once
 
     mapping(string orderId => Order order) private s_Orders;
-    IERC20 public usdtToken;
 
     // *********************** EVENTS ***********************
-    event orderCreated(orderStatus indexed status, string orderId, uint256 cryptoAmount);
+    event orderCreated(
+        orderStatus indexed status,
+        string orderId,
+        uint256 cryptoAmount
+    );
     event orderReleased(string orderId, uint256 cryptoAmount);
     event orderChangeStatus(
-        string orderId, address user, string description, orderStatus oldStatus, orderStatus newStatus
+        string orderId,
+        address user,
+        string description,
+        orderStatus oldStatus,
+        orderStatus newStatus
     );
     // ********************** END OF EVENTS ***********************
 
@@ -83,17 +91,20 @@ contract DigitalP2P is Ownable {
     }
 
     // functions
-    constructor(address _usdtTokenAddress) Ownable(msg.sender) {
-        usdtToken = IERC20(_usdtTokenAddress);
-    }
+    constructor() Ownable(msg.sender) {}
 
     receive() external payable {}
 
     /// @notice Process the order to buy USDT
     /// @param _orderId The order id
     /// @param cryptoAmount The amount of USDT sent by the user. value should contain 6 decimal places
+    /// @param tokenAddress The address of the token to buy
     /// @dev The usdtToken approve should be done before calling this function
-    function processOrder(string memory _orderId, uint256 cryptoAmount) public {
+    function processOrder(
+        string memory _orderId,
+        uint256 cryptoAmount,
+        address tokenAddress
+    ) public validAddress(tokenAddress) {
         if (cryptoAmount <= 0) {
             revert DigitalP2P_AmountShouldBeGreaterThanZero();
         }
@@ -104,28 +115,39 @@ contract DigitalP2P is Ownable {
             revert DigitalP2P_AmountShouldBeLessThanMaximumAmount();
         }
         if (!_orderId.isValidUUIDv4()) revert DigitalP2P_InvalidOrderId();
-        if (keccak256(abi.encodePacked(s_Orders[_orderId].id)) == keccak256(abi.encodePacked(_orderId))) {
+        if (
+            keccak256(abi.encodePacked(s_Orders[_orderId].id)) ==
+            keccak256(abi.encodePacked(_orderId))
+        ) {
             revert DigitalP2P_OrderAlreadyExists();
         }
 
-        bool success = usdtToken.transferFrom(msg.sender, address(this), cryptoAmount);
+        IERC20 usdtToken = IERC20(tokenAddress);
+
+        bool success = usdtToken.transferFrom(
+            msg.sender,
+            address(this),
+            cryptoAmount
+        );
         if (!success) revert DigitalP2P_TransferNotProccessed();
 
-        s_Orders[_orderId] = Order({id: _orderId, cryptoAmount: cryptoAmount, status: orderStatus.Pending});
+        s_Orders[_orderId] = Order({
+            id: _orderId,
+            cryptoAmount: cryptoAmount,
+            status: orderStatus.Pending,
+            tokenAddress: tokenAddress
+        });
         emit orderCreated(orderStatus.Pending, _orderId, cryptoAmount);
-    }
-
-    /// @notice This funcion requests permisson to the user to spend the USDT
-    /// @param _amount The amount of USDT to approve
-    function approve(uint256 _amount) public returns (bool) {
-        return usdtToken.approve(address(this), _amount);
     }
 
     /// @notice This function should be triggered by the seller to release the order.
     /// @param _orderId The order id
+    /// @param buyer The address of the buyer
     /// @dev Only the seller can release the order
-
-    function releaseOrder(string memory _orderId, address buyer) public onlyOwnerOrAdmin {
+    function releaseOrder(
+        string memory _orderId,
+        address buyer
+    ) public onlyOwnerOrAdmin {
         if (!_orderId.isValidUUIDv4()) revert DigitalP2P_InvalidOrderId();
         if (buyer == address(0)) revert DigitalP2P_InvalidAddress();
         Order storage order = s_Orders[_orderId];
@@ -133,6 +155,7 @@ contract DigitalP2P is Ownable {
         if (order.status != orderStatus.Pending) {
             revert DigitalP2P_InvalidOrderStatus();
         }
+        IERC20 usdtToken = IERC20(order.tokenAddress);
         uint256 fee = getBotFee(order.cryptoAmount);
         uint256 amountToTransfer = order.cryptoAmount - fee;
         bool success = usdtToken.transfer(buyer, amountToTransfer);
@@ -141,12 +164,19 @@ contract DigitalP2P is Ownable {
         delete s_Orders[_orderId];
     }
 
-    function updateOrderStatus(string memory _orderId, orderStatus _status) public onlyOwnerOrAdmin {
+    function updateOrderStatus(
+        string memory _orderId,
+        orderStatus _status
+    ) public onlyOwnerOrAdmin {
         if (!_orderId.isValidUUIDv4()) revert DigitalP2P_InvalidOrderId();
         Order storage order = s_Orders[_orderId];
         if (bytes(order.id).length == 0) revert DigitalP2P_OrderDoesNotExist();
         emit orderChangeStatus(
-            _orderId, msg.sender, string(abi.encodePacked("from", order.status, " to ", _status)), order.status, _status
+            _orderId,
+            msg.sender,
+            string(abi.encodePacked("from", order.status, " to ", _status)),
+            order.status,
+            _status
         );
         order.status = _status;
     }
@@ -179,13 +209,17 @@ contract DigitalP2P is Ownable {
 
     /// @notice Change the owner of the contract
     /// @param _newOwner The new owner of the contract
-    function changeOwner(address _newOwner) public onlyOwner validAddress(_newOwner) {
+    function changeOwner(
+        address _newOwner
+    ) public onlyOwner validAddress(_newOwner) {
         transferOwnership(_newOwner);
     }
 
     /// @notice Add an admin to the contract
     /// @param adminAddress The address of the admin
-    function addAdmin(address adminAddress) public onlyOwner validAddress(adminAddress) {
+    function addAdmin(
+        address adminAddress
+    ) public onlyOwner validAddress(adminAddress) {
         if (adminAddress == address(0)) revert DigitalP2P_InvalidAddress();
         if (s_admins[adminAddress] != address(0)) {
             revert DigitalP2P_AdminAddressAlreadyExists();
@@ -195,7 +229,9 @@ contract DigitalP2P is Ownable {
 
     /// @notice Remove an admin from the contract
     /// @param adminAddress The address of the admin
-    function removeAdmin(address adminAddress) public onlyOwner validAddress(adminAddress) {
+    function removeAdmin(
+        address adminAddress
+    ) public onlyOwner validAddress(adminAddress) {
         if (adminAddress == address(0)) revert DigitalP2P_InvalidAddress();
         if (s_admins[adminAddress] == address(0)) {
             revert DigitalP2P_AdminAddressAlreadyExists();
@@ -206,7 +242,12 @@ contract DigitalP2P is Ownable {
     /// @notice Withdraw the USDT from the contract
     /// @param recipient The address to send the USDT
     /// @param _amount The amount of USDT to send
-    function withDrawToken(address recipient, uint256 _amount) public onlyOwner {
+    function withDrawToken(
+        address recipient,
+        uint256 _amount,
+        address tokenAddress
+    ) public onlyOwner validAddress(tokenAddress) {
+        IERC20 usdtToken = IERC20(tokenAddress);
         if (usdtToken.balanceOf(address(this)) < _amount) {
             revert DigitalP2P_InsufficientUsdtBalance();
         }
@@ -244,7 +285,9 @@ contract DigitalP2P is Ownable {
 
     /// @notice Get the order by id
     /// @param orderId The order id
-    function getOrder(string memory orderId) external view returns (Order memory) {
+    function getOrder(
+        string memory orderId
+    ) external view returns (Order memory) {
         return s_Orders[orderId];
     }
 
@@ -255,19 +298,44 @@ contract DigitalP2P is Ownable {
 
     /// @notice Get the balance of the contract
 
-    function getUSDTBalance() external view returns (uint256) {
+    function getUSDTBalance(
+        address tokenAddress
+    ) external view validAddress(tokenAddress) returns (uint256) {
+        //TODO validate the token address is a valid ERC20 token
+        IERC20 usdtToken = IERC20(tokenAddress);
         return usdtToken.balanceOf(address(this));
     }
 
     /// @notice Get the balance of the user
     /// @param userAddress The user address
-    function getUserBalance(address userAddress) external view returns (uint256) {
+    function getUserBalance(
+        address userAddress,
+        address tokenAddress
+    )
+        external
+        view
+        validAddress(tokenAddress)
+        validAddress(userAddress)
+        returns (uint256)
+    {
+        IERC20 usdtToken = IERC20(tokenAddress);
         return usdtToken.balanceOf(userAddress);
     }
 
     /// @notice Get the allowance of the user to the contract
     /// @param userAddress The user address
-    function getUserAllowance(address userAddress) external view returns (uint256) {
+    /// @param tokenAddress The token address USDT, USDC
+    function getUserAllowance(
+        address userAddress,
+        address tokenAddress
+    )
+        external
+        view
+        validAddress(userAddress)
+        validAddress(tokenAddress)
+        returns (uint256)
+    {
+        IERC20 usdtToken = IERC20(tokenAddress);
         return usdtToken.allowance(userAddress, address(this));
     }
 

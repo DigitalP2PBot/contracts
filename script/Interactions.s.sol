@@ -18,22 +18,31 @@ contract DigitalP2PProcessOrder is Script {
     uint256 constant ANVIL_CHAIN_ID = 31337;
     ERC20Mock usdtToken;
 
-    function processOrder(address mostRecentlyDeployed) public {
+    function processOrder(
+        address mostRecentlyDeployed,
+        address tokenAddress
+    ) public {
         uint256 _amount = 5;
         DigitalP2P digitalP2P = DigitalP2P(payable(mostRecentlyDeployed));
         vm.startBroadcast();
-        usdtToken = ERC20Mock(address(digitalP2P.usdtToken()));
-        usdtToken.mint(SELLER, AMOUNT_USDT_TOKEN_TO_MINT * USDT_DECIMAL_PLACES);
-        usdtToken.approve(address(digitalP2P), _amount * USDT_DECIMAL_PLACES);
 
-        digitalP2P.processOrder(ORDER_ID, _amount);
+        digitalP2P.processOrder(ORDER_ID, _amount, tokenAddress);
         vm.stopBroadcast();
     }
 
-    function run() public {
-        address mostRecentlyDeployed = DevOpsTools.get_most_recent_deployment("DigitalP2P", block.chainid);
-        console.log("last deploy[, mostRecentlyDeployed]", mostRecentlyDeployed);
-        processOrder(payable(mostRecentlyDeployed));
+    /**
+     * @dev Run the script forge script DigitalP2PProcessOrder --sig "run(address)" 0xTokenAddressHere
+     */
+    function run(address tokenAddress) public {
+        address mostRecentlyDeployed = DevOpsTools.get_most_recent_deployment(
+            "DigitalP2P",
+            block.chainid
+        );
+        console.log(
+            "last deploy[, mostRecentlyDeployed]",
+            mostRecentlyDeployed
+        );
+        processOrder(payable(mostRecentlyDeployed), tokenAddress);
     }
 }
 
@@ -48,7 +57,10 @@ contract DigitalP2PReleaseOrder is Script {
     }
 
     function run() public {
-        address mostRecentlyDeployed = DevOpsTools.get_most_recent_deployment("DigitalP2P", block.chainid);
+        address mostRecentlyDeployed = DevOpsTools.get_most_recent_deployment(
+            "DigitalP2P",
+            block.chainid
+        );
         releaseOrder(mostRecentlyDeployed);
     }
 }

@@ -36,11 +36,16 @@ ifeq ($(findstring --network polygon,$(ARGS)),--network polygon)
 	NETWORK_ARGS := --rpc-url $(POLIGON_RPC_URL) --account $(POLIGON_ACCOUNT_ADDRESS) --broadcast --verify --etherscan-api-key $(ETHERSCAN_API_KEY) -vvvv
 endif
 
+ifeq ($(findstring --network sepolia,$(ARGS)),--network sepolia)
+	NETWORK_ARGS := --rpc-url $(SEPOLIA_RPC_URL) --account $(SEPOLIA_ACCOUNT_ADDRESS) --broadcast --verify --etherscan-api-key $(SEPOLIA_ETHERSCAN_API_KEY) -vvvv
+endif
+
 deploy-polygon:
 	@forge format
 	@forge clean
 	@forge test
 	@forge script script/DeployDigitalP2P.s.sol:DeployDigitalP2P $(NETWORK_ARGS)
+
 
 #SENDER_ADDRESS := <sender's address>
 SENDER_ADDRESS := 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
