@@ -18,10 +18,7 @@ contract DigitalP2PProcessOrder is Script {
     uint256 constant ANVIL_CHAIN_ID = 31337;
     ERC20Mock usdtToken;
 
-    function processOrder(
-        address mostRecentlyDeployed,
-        address tokenAddress
-    ) public {
+    function processOrder(address mostRecentlyDeployed, address tokenAddress) public {
         uint256 _amount = 5;
         DigitalP2P digitalP2P = DigitalP2P(payable(mostRecentlyDeployed));
         vm.startBroadcast();
@@ -34,14 +31,8 @@ contract DigitalP2PProcessOrder is Script {
      * @dev Run the script forge script DigitalP2PProcessOrder --sig "run(address)" 0xTokenAddressHere
      */
     function run(address tokenAddress) public {
-        address mostRecentlyDeployed = DevOpsTools.get_most_recent_deployment(
-            "DigitalP2P",
-            block.chainid
-        );
-        console.log(
-            "last deploy[, mostRecentlyDeployed]",
-            mostRecentlyDeployed
-        );
+        address mostRecentlyDeployed = DevOpsTools.get_most_recent_deployment("DigitalP2P", block.chainid);
+        console.log("last deploy[, mostRecentlyDeployed]", mostRecentlyDeployed);
         processOrder(payable(mostRecentlyDeployed), tokenAddress);
     }
 }
@@ -57,10 +48,39 @@ contract DigitalP2PReleaseOrder is Script {
     }
 
     function run() public {
-        address mostRecentlyDeployed = DevOpsTools.get_most_recent_deployment(
-            "DigitalP2P",
-            block.chainid
-        );
+        address mostRecentlyDeployed = DevOpsTools.get_most_recent_deployment("DigitalP2P", block.chainid);
         releaseOrder(mostRecentlyDeployed);
+    }
+}
+
+contract DigitalP2PWithDraw is Script {
+    function withdraw(address mostRecentlyDeployed) public {
+        vm.startBroadcast();
+        DigitalP2P(payable(mostRecentlyDeployed)).withdraw();
+        vm.stopBroadcast();
+    }
+
+    function run() public {
+        address mostRecentlyDeployed = DevOpsTools.get_most_recent_deployment("DigitalP2P", block.chainid);
+        withdraw(mostRecentlyDeployed);
+    }
+}
+
+/**
+ * @dev This contract is used to withdraw tokens from the DigitalP2P contract
+ * run the script forge script DigitalP2PWithDrawToken --sig "run(address,uint,address)" 0xRecipientAddressHere 100 0xTokenAddressHere
+ */
+contract DigitalP2PWithDrawToken is Script {
+    function withdrawToken(address mostRecentlyDeployed, address recipient, uint256 amount, address tokenAddress)
+        public
+    {
+        vm.startBroadcast();
+        DigitalP2P(payable(mostRecentlyDeployed)).withDrawToken(recipient, amount, tokenAddress);
+        vm.stopBroadcast();
+    }
+
+    function run(address recipient, uint256 amount, address tokenAddress) public {
+        address mostRecentlyDeployed = DevOpsTools.get_most_recent_deployment("DigitalP2P", block.chainid);
+        withdrawToken(mostRecentlyDeployed, recipient, amount, tokenAddress);
     }
 }
