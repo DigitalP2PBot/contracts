@@ -118,7 +118,6 @@ contract DigitalP2P is Ownable {
         if (keccak256(abi.encodePacked(s_Orders[_orderId].id)) == keccak256(abi.encodePacked(_orderId))) {
             revert DigitalP2P_OrderAlreadyExists();
         }
-
         IERC20 usdtToken = IERC20(tokenAddress);
         uint256 allowance = usdtToken.allowance(msg.sender, address(this));
         if (allowance < cryptoAmount) {
@@ -126,7 +125,6 @@ contract DigitalP2P is Ownable {
         }
         bool success = usdtToken.transferFrom(msg.sender, address(this), cryptoAmount);
         if (!success) revert DigitalP2P_TransferNotProccessed();
-
         s_Orders[_orderId] =
             Order({id: _orderId, cryptoAmount: cryptoAmount, status: orderStatus.Pending, tokenAddress: tokenAddress});
         emit orderCreated(orderStatus.Pending, _orderId, cryptoAmount);
@@ -246,7 +244,7 @@ contract DigitalP2P is Ownable {
         return success;
     }
 
-    // @notice Function to withdraw all native tokens to the owner's address
+    // @notice Function to ws_TokenCommissioiethdraw all native tokens to the owner's address
     function withdraw() external onlyOwner {
         payable(owner()).transfer(address(this).balance);
     }
@@ -273,6 +271,12 @@ contract DigitalP2P is Ownable {
     /// @param orderId The order id
     function getOrder(string memory orderId) external view returns (Order memory) {
         return s_Orders[orderId];
+    }
+
+    /// @notice Get order commission
+    /// @param tokenAddress The token address
+    function getTokenComission(address tokenAddress) external view returns (uint256 commission) {
+        return s_TokenCommission[tokenAddress];
     }
 
     /// @notice Get the balance of the contract

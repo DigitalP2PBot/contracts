@@ -177,6 +177,8 @@ contract DigitalP2PTest is Test {
         assertEq(orderCreated.cryptoAmount, amount);
         assertEq(uint256(orderCreated.status), uint256(DigitalP2P.orderStatus.Pending));
         assertEq(orderCreated.tokenAddress, address(tokenAddress));
+        uint256 tokenComission = digitalP2P.getTokenComission(address(tokenAddress));
+        assertEq(tokenComission, 0);
     }
 
     function testProcessOrderEventEmitsOrderCreatedWithIndexes() public {
@@ -342,6 +344,19 @@ contract DigitalP2PTest is Test {
         uint256 buyerBalance = digitalP2P.getUserBalance(BUYER, address(tokenAddress));
         uint256 botFee = digitalP2P.getBotFee(amount);
         assertEq(buyerBalance, AMOUNT_USDT_TOKEN_TO_MINT * USDT_DECIMAL_PLACES + amount - botFee);
+    }
+
+    function testReleaseCheckTokenComission() public {
+        uint256 amount = 5 * USDT_DECIMAL_PLACES;
+        vm.prank(SELLER);
+        tokenAddress.approve(address(digitalP2P), amount);
+        vm.prank(SELLER);
+        digitalP2P.processOrder(ORDER_ID, amount, address(tokenAddress));
+        vm.prank(msg.sender);
+        digitalP2P.releaseOrder(ORDER_ID, BUYER);
+        uint256 botFee = digitalP2P.getBotFee(amount);
+        uint256 tokenComission = digitalP2P.getTokenComission(address(tokenAddress));
+        assertEq(tokenComission, botFee);
     }
 
     function testReleaseFundsSuccessAmountWithDecimal() public {
@@ -558,10 +573,19 @@ contract DigitalP2PTest is Test {
         tokenAddress.mint(address(digitalP2P), AMOUNT_USDT_TOKEN_TO_MINT);
         uint256 amount = 2 * USDT_DECIMAL_PLACES;
         address userTo = makeAddr("new user");
-        vm.prank(msg.sender);
-        digitalP2P.withDrawToken(userTo, amount, address(tokenAddress));
+        vm.startPrank(SELLER);
+        tokenAddress.approve(address(digitalP2P), amount);
+        digitalP2P.processOrder(ORDER_ID, amount, address(tokenAddress));
+        vm.stopPrank();
+        vm.startPrank(msg.sender);
+        digitalP2P.releaseOrder(ORDER_ID, BUYER);
+        uint256 botComission = digitalP2P.getBotFee(amount);
+        digitalP2P.withDrawToken(userTo, botComission, address(tokenAddress));
+        vm.stopPrank();
         uint256 userBalance = digitalP2P.getUserBalance(userTo, address(tokenAddress));
-        assertEq(userBalance, amount);
+        assertEq(userBalance, botComission);
+        uint256 tokenComission = digitalP2P.getTokenComission(address(tokenAddress));
+        assertEq(tokenComission, 0);
     }
 
     function testWithdrawNativeTokenShouldBeOwner() public {
