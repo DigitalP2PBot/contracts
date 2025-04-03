@@ -275,7 +275,7 @@ contract DigitalP2P is Ownable {
 
     /// @notice Get order commission
     /// @param tokenAddress The token address
-    function getTokenComission(address tokenAddress) external view returns (uint256 commission) {
+    function getTokenCommission(address tokenAddress) external view returns (uint256 commission) {
         return s_TokenCommission[tokenAddress];
     }
 
