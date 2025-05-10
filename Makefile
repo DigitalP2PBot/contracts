@@ -38,9 +38,6 @@ ifeq ($(findstring --network polygon,$(ARGS)),--network polygon)
 	NETWORK_ARGS := --rpc-url $(POLYGON_RPC_URL) --account $(POLYGON_ACCOUNT_ADDRESS) --broadcast --verify --etherscan-api-key $(POLYGON_ETHERSCAN_API_KEY) -vvvv
 endif
 
-ifeq ($(findstring --network polygon-prod,$(ARGS)),--network polygon-prod)
-	NETWORK_ARGS := --rpc-url $(POLYGON_RPC_URL)  --broadcast -t --verify --etherscan-api-key $(POLYGON_ETHERSCAN_API_KEY) -vvvv
-endif
 
 ifeq ($(findstring --network polygon-prod-command,$(ARGS)),--network polygon-prod-command)
 	NETWORK_ARGS := --rpc-url $(POLYGON_RPC_URL)  --broadcast   -vvvv
@@ -48,6 +45,10 @@ endif
 
 ifeq ($(findstring --network sepolia,$(ARGS)),--network sepolia)
 	NETWORK_ARGS := --rpc-url $(SEPOLIA_RPC_URL) --account $(SEPOLIA_ACCOUNT_ADDRESS) --broadcast --verify --etherscan-api-key $(SEPOLIA_ETHERSCAN_API_KEY) -vvvv
+endif
+
+ifeq ($(findstring --network polygon-prod,$(ARGS)),--network polygon-prod)
+	NETWORK_ARGS := --rpc-url $(POLYGON_RPC_URL)  --broadcast -t --verify --etherscan-api-key $(POLYGON_ETHERSCAN_API_KEY) -vvvv
 endif
 
 deploy:
@@ -77,4 +78,13 @@ withDrawToken:
 	@forge script script/Interactions.s.sol:DigitalP2PWithDrawToken \
 		--sender $(SENDER_ADDRESS)  $(NETWORK_ARGS) \
 		--sig "run(address,uint256,address)" \
-		0x14d5d32bccdaa481e41868206c96fd97f49dc7dc 1000000 0xc2132D05D31c914a87C6611C10748AEb04B58e8F \
+		0x04828440888dbD767FfD55846E75aba5968e9906 1000000 0xc2132D05D31c914a87C6611C10748AEb04B58e8F \
+
+deployPolygon:
+     # When a new deploy is done we need to add the production wallet to the contract admins
+	 # Wallet address 0x3653eA67Fa41003a9685a1b4b7205EC69CB280e7
+	 # We need to update network record, we must replace contract address
+	 # We need to create a new webhook in alchemy
+	 # We need to encrypt the new alchemy key, and update the field in the network database alchemySigningKey
+	 @export ENV=prod
+	 @make deploy ARGS="--network polygon-prod"
